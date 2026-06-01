@@ -237,21 +237,26 @@ func main() {
 		const fillerMaxDuration = 900 * time.Millisecond
 
 		for attempt := 0; attempt < 3; attempt++ {
-			// Play filler audio concurrently to mask LLM latency
+			// Play filler audio concurrently to mask LLM latency (localized using last response language)
 			fillerCtx, fillerCancel := context.WithTimeout(ctx, fillerMaxDuration)
-			go func() {
-				_ = player.PlayFiller(fillerCtx, "assets/hmm_bn.wav")
-			}()
+			fillerFile := fmt.Sprintf("assets/hmm_%s.wav", bb.GetLastLang())
+			go func(file string) {
+				_ = player.PlayFiller(fillerCtx, file)
+			}(fillerFile)
 
 			resp, isFast, err := router.Route(ctx, currentPrompt, cm)
 			fillerCancel()
-			// Small yield to let filler goroutine release the Player mutex before PlayStream
-			time.Sleep(10 * time.Millisecond)
+			// Small yield to let filler goroutine release the Player mutex before PlayStream (only on slow path)
+			if !isFast {
+				time.Sleep(10 * time.Millisecond)
+			}
 
 			if err != nil {
 				fmt.Printf("Gopal Bhar (Error) > ওরে বাবা! মাথা কাজ করছে না! (Error: %v)\n", err)
 				break
 			}
+
+			bb.SetLastLang(resp.LanguageCode)
 
 			// Append LLM reply to context
 			respJSON, _ := json.Marshal(resp)

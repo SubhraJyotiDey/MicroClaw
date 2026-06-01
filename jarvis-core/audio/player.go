@@ -39,7 +39,6 @@ func (p *Player) Interrupt() {
 // PlayFiller plays a pre-cached local audio file (e.g., "Hmm") to mask latency.
 // Mutex protection ensures it releases the ALSA device before any streaming TTS begins.
 func (p *Player) PlayFiller(ctx context.Context, filepath string) error {
-	p.Interrupt()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -95,7 +94,6 @@ func (p *Player) PlayFiller(ctx context.Context, filepath string) error {
 
 // PlayStream reads from the audioReader and streams audio playback.
 func (p *Player) PlayStream(ctx context.Context, audioReader io.Reader) error {
-	p.Interrupt() // Terminate any active filler or playback to release ALSA device
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

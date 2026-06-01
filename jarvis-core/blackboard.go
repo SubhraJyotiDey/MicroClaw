@@ -11,12 +11,14 @@ type Blackboard struct {
 	isListening      bool
 	sessionID        string
 	hardwareState    map[string]interface{}
+	lastLang         string
 }
 
 // NewBlackboard initializes a new Blackboard instance.
 func NewBlackboard() *Blackboard {
 	return &Blackboard{
 		hardwareState: make(map[string]interface{}),
+		lastLang:      "bn", // Default to Bengali
 	}
 }
 
@@ -75,4 +77,21 @@ func (b *Blackboard) SetHardwareState(key string, val interface{}) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.hardwareState[key] = val
+}
+
+// GetLastLang returns the last response language ISO tag.
+func (b *Blackboard) GetLastLang() string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.lastLang == "" {
+		return "bn"
+	}
+	return b.lastLang
+}
+
+// SetLastLang updates the last response language ISO tag.
+func (b *Blackboard) SetLastLang(lang string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.lastLang = lang
 }

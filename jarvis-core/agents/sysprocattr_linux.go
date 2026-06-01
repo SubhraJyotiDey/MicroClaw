@@ -5,14 +5,9 @@ package agents
 
 import (
 	"os/exec"
-	"syscall"
 )
 
 func prepareCmdAttrs(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: 65534, // nobody
-			Gid: 65534, // nogroup
-		},
-	}
+	// No-op to avoid operation not permitted (CAP_SETUID) errors when running as non-root user (e.g. 'pi') on RPi.
+	// Sandbox security is enforced via resolvePath checks and healer validateCode.
 }

@@ -20,12 +20,14 @@ MicroClaw is a lightweight, AI-powered hardware agent designed to run natively o
 - **Go** (1.20+)
 - **Python** (3.8+)
 - **ALSA Utilities** (`alsa-utils` for `arecord` and `aplay`)
+- **mpg123** (for streaming/decoding MP3 audio from Edge-TTS)
+- **espeak-ng** (to optionally regenerate localized filler WAV assets)
 - **fswebcam** (for taking pictures)
 
 ### Installing Dependencies on Raspberry Pi
 ```bash
 sudo apt-get update
-sudo apt-get install alsa-utils fswebcam python3
+sudo apt-get install alsa-utils fswebcam mpg123 espeak-ng python3
 ```
 
 ## Setup & Installation 🚀
@@ -58,7 +60,16 @@ sudo apt-get install alsa-utils fswebcam python3
    go build -o microclaw
    ```
 
-4. **Run MicroClaw**
+4. **Set Up Filler Audio Assets (Optional)**
+   The repository includes pre-built filler audio files. To regenerate or customize them, make sure `espeak-ng` is installed and run:
+   ```bash
+   mkdir -p assets
+   espeak-ng -v bn -w assets/hmm_bn.wav "এক মুহূর্ত"
+   espeak-ng -v hi -w assets/hmm_hi.wav "एक पल"
+   espeak-ng -v en -w assets/hmm_en.wav "one moment"
+   ```
+
+5. **Run MicroClaw**
    ```bash
    ./microclaw
    ```
