@@ -290,23 +290,29 @@ func main() {
 }
 
 func speakAndPlay(ctx context.Context, tts *audio.TTSClient, player *audio.Player, text string, lang string, gender string) {
-	pr, pw := io.Pipe()
-
-	// Start speech streaming in a background thread
-	go func() {
-		err := tts.StreamSpeech(ctx, text, lang, gender, pw)
-		if err != nil {
-			log.Printf("[TTS ERROR] %v", err)
-			_ = pw.CloseWithError(err)
-		} else {
-			_ = pw.Close()
-		}
-	}()
-
-	// Read and play on primary ALSA output device (aplay)
-	err := player.PlayStream(ctx, pr)
-	if err != nil {
-		log.Printf("[PLAYBACK ERROR] %v", err)
+	// Chunk text into sentences for sub-second first-audio latency
+	chunks := audio.ChunkText(text)
+	if len(chunks) == 0 {
+		return
 	}
-	_ = pr.Close()
+
+	for _, chunk := range chunks {
+		pr, pw := io.Pipe()
+
+		go func(c string) {
+			err := tts.StreamSpeech(ctx, c, lang, gender, pw)
+			if err != nil {
+				log.Printf("[TTS ERROR] %v", err)
+				_ = pw.CloseWithError(err)
+			} else {
+				_ = pw.Close()
+			}
+		}(chunk)
+
+		err := player.PlayStream(ctx, pr)
+		if err != nil {
+			log.Printf("[PLAYBACK ERROR] %v", err)
+		}
+		_ = pr.Close()
+	}
 }

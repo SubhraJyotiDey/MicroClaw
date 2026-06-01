@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -17,10 +19,25 @@ type CoderAgent struct {
 }
 
 // NewCoderAgent constructs a new CoderAgent sandbox wrapper.
+// Pre-warms the Python interpreter to reduce first-execution latency (~800ms on RPi Zero 2W).
 func NewCoderAgent(sandboxDir string) (*CoderAgent, error) {
 	if err := os.MkdirAll(sandboxDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to configure sandbox directory: %w", err)
 	}
+
+	// Pre-warm Python interpreter in background to avoid cold-start latency
+	go func() {
+		pyCmd := "python3"
+		if runtime.GOOS == "windows" {
+			pyCmd = "python"
+		}
+		if err := exec.Command(pyCmd, "-c", "pass").Run(); err != nil {
+			log.Printf("[CoderAgent] Python pre-warm failed (non-fatal): %v", err)
+		} else {
+			log.Println("[CoderAgent] Python interpreter pre-warmed successfully.")
+		}
+	}()
+
 	return &CoderAgent{sandboxDir: sandboxDir}, nil
 }
 

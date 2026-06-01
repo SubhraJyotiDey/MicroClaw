@@ -3,7 +3,6 @@ package audio
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -65,6 +64,10 @@ func (s *STTClient) Transcribe(ctx context.Context, wavReader io.Reader, lang st
 		return "", fmt.Errorf("stt payload model injection failed: %w", err)
 	}
 
+	if err := writer.WriteField("response_format", "text"); err != nil {
+		return "", fmt.Errorf("stt payload response_format injection failed: %w", err)
+	}
+
 	if lang != "" && lang != "auto" {
 		if err := writer.WriteField("language", lang); err != nil {
 			return "", fmt.Errorf("stt payload language injection failed: %w", err)
@@ -113,14 +116,13 @@ func (s *STTClient) Transcribe(ctx context.Context, wavReader io.Reader, lang st
 		return "", fmt.Errorf("stt api returned error status %d: %s", resp.StatusCode, string(respBytes))
 	}
 
-	var result struct {
-		Text string `json:"text"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("stt json response parse failed: %w", err)
+	// response_format=text returns raw transcript text, not JSON
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("stt response read failed: %w", err)
 	}
 
-	return result.Text, nil
+	return strings.TrimSpace(string(respBytes)), nil
 }
 
 func logMockTranscribe(lang string) {

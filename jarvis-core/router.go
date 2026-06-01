@@ -106,11 +106,6 @@ func (r *Router) sendHardwareCmd(cmd agents.HardwareCommand) {
 	}
 }
 
-func matchesOff(text string) bool {
-	t := strings.ToLower(text)
-	return strings.Contains(t, "off") || strings.Contains(t, "बंद") || strings.Contains(t, "বন্ধ")
-}
-
 func detectLang(text string) string {
 	hiCount := 0
 	bnCount := 0
@@ -212,6 +207,7 @@ func (r *Router) callLLM(ctx context.Context, messages []Message) (*LLMResponse,
 		"model":       model,
 		"messages":    messages,
 		"temperature": 0.3,
+		"max_tokens":  120,
 	}
 
 	// Instruct LLM to output JSON format

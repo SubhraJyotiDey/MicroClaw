@@ -191,8 +191,15 @@ func (v *VAD) StartLoop(ctx context.Context) {
 				recordedBytes = append(recordedBytes, chunkCopy...)
 
 				silenceDuration += 50 * time.Millisecond
-				if silenceDuration >= 1200*time.Millisecond {
-					log.Printf("[VAD] Silence detected (sustained for %v). Processing recording of %d bytes...", silenceDuration, len(recordedBytes))
+
+				// Adaptive silence gate: short for quick commands, longer for extended speech
+				silenceGate := 600 * time.Millisecond
+				if len(recordedBytes) > 32000*3 { // >3 seconds of speech recorded
+					silenceGate = 1000 * time.Millisecond
+				}
+
+				if silenceDuration >= silenceGate {
+					log.Printf("[VAD] Silence detected (sustained for %v, gate=%v). Processing recording of %d bytes...", silenceDuration, silenceGate, len(recordedBytes))
 
 					// Prepend WAV header
 					wavBytes := pcmToWav(recordedBytes, 16000)

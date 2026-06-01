@@ -106,14 +106,21 @@ func (s *SkillsManager) runCaptureVision(ctx context.Context, prompt string) (st
 		prompt = "Describe the workbench state."
 	}
 
-	outputPath := "camera_capture.jpg"
+	// Use a temp file to prevent race conditions between concurrent vision calls
+	tmpFile, err := os.CreateTemp("", "microclaw_vision_*.jpg")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file for capture: %w", err)
+	}
+	outputPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(outputPath)
+
 	log.Printf("[Skills] Capturing camera frame to %s...", outputPath)
 
-	err := s.vision.CaptureFrame(ctx, outputPath)
+	err = s.vision.CaptureFrame(ctx, outputPath)
 	if err != nil {
 		return "", fmt.Errorf("camera capture failed: %w", err)
 	}
-	defer os.Remove(outputPath)
 
 	log.Printf("[Skills] Submitting photo to Multimodal Vision model...")
 	analysis, err := s.vision.AnalyzeFrame(ctx, outputPath, prompt)

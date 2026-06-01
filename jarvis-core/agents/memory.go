@@ -39,6 +39,11 @@ func NewMemoryAgent(dbPath string) (*MemoryAgent, error) {
 		return nil, fmt.Errorf("sqlite connection failed: %w", err)
 	}
 
+	// Enable WAL mode for better concurrent read/write performance on RPi
+	db.Exec("PRAGMA journal_mode=WAL;")
+	db.Exec("PRAGMA synchronous=NORMAL;")
+	db.Exec("PRAGMA cache_size=1000;")
+
 	agent := &MemoryAgent{db: db}
 	if err := agent.initSchema(); err != nil {
 		_ = db.Close()
