@@ -76,7 +76,8 @@ func main() {
 
 	// Initialize execution agents
 	hwChan := make(chan agents.HardwareCommand, 100)
-	hwAgent := agents.NewHardwareAgent(kettleIP, irrigIP, memory)
+	relayToken := os.Getenv("RELAY_TOKEN")
+	hwAgent := agents.NewHardwareAgent(kettleIP, irrigIP, relayToken, memory)
 	go hwAgent.StartLoop(ctx, hwChan)
 
 	coderAgent, err := agents.NewCoderAgent("sandbox")
@@ -233,8 +234,20 @@ func main() {
 		currentPrompt := input
 
 		// Allow up to 3 sequential skill calls per turn (Agentic Loop)
+		const fillerMaxDuration = 900 * time.Millisecond
+
 		for attempt := 0; attempt < 3; attempt++ {
+			// Play filler audio concurrently to mask LLM latency
+			fillerCtx, fillerCancel := context.WithTimeout(ctx, fillerMaxDuration)
+			go func() {
+				_ = player.PlayFiller(fillerCtx, "assets/hmm_bn.wav")
+			}()
+
 			resp, isFast, err := router.Route(ctx, currentPrompt, cm)
+			fillerCancel()
+			// Small yield to let filler goroutine release the Player mutex before PlayStream
+			time.Sleep(10 * time.Millisecond)
+
 			if err != nil {
 				fmt.Printf("Gopal Bhar (Error) > ওরে বাবা! মাথা কাজ করছে না! (Error: %v)\n", err)
 				break

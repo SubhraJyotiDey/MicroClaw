@@ -19,15 +19,17 @@ type HardwareCommand struct {
 type HardwareAgent struct {
 	kettleIP     string
 	irrigationIP string
+	authToken    string
 	client       *http.Client
 	memory       *MemoryAgent
 }
 
 // NewHardwareAgent constructs a new Hardware controller.
-func NewHardwareAgent(kettleIP, irrigationIP string, memory *MemoryAgent) *HardwareAgent {
+func NewHardwareAgent(kettleIP, irrigationIP, authToken string, memory *MemoryAgent) *HardwareAgent {
 	return &HardwareAgent{
 		kettleIP:     kettleIP,
 		irrigationIP: irrigationIP,
+		authToken:    authToken,
 		memory:       memory,
 		client: &http.Client{
 			Timeout: 2 * time.Second,
@@ -51,8 +53,11 @@ func (h *HardwareAgent) ControlDevice(ctx context.Context, device, action string
 		stateVal = "1"
 	}
 
-	// Trigger standard REST API GET endpoint for ESP32 lab relays:
+	// Trigger standard REST API GET endpoint for ESP32 lab relays with auth token:
 	url := fmt.Sprintf("http://%s/control?state=%s", ip, stateVal)
+	if h.authToken != "" {
+		url += "&token=" + h.authToken
+	}
 	log.Printf("[HardwareAgent] Swerving control request to URL: %s", url)
 
 	// Mock bypass handling for test harnesses or localhost testing

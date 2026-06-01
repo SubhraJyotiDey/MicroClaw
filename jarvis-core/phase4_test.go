@@ -21,7 +21,7 @@ func TestHardwareAgent(t *testing.T) {
 	defer ma.Close()
 
 	// Initialize hardware agent with mock IPs
-	ha := agents.NewHardwareAgent("127.0.0.1", "127.0.0.1", ma)
+	ha := agents.NewHardwareAgent("127.0.0.1", "127.0.0.1", "", ma)
 
 	// Test control device
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

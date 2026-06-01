@@ -24,6 +24,7 @@ type ContextManager struct {
 	mu             sync.RWMutex
 	rawHistory     []Message
 	runningSummary string
+	generation     uint64 // incremented on every AddMessage for rollback safety
 }
 
 // NewContextManager instantiates a clean memory manager.
@@ -38,6 +39,7 @@ func (cm *ContextManager) AddMessage(role, content string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.rawHistory = append(cm.rawHistory, Message{Role: role, Content: content})
+	cm.generation++
 }
 
 // GetMessagesForLLM prepares the full list of messages to feed the brain LLM.
@@ -82,6 +84,7 @@ func (cm *ContextManager) CompressIfNeeded(ctx context.Context, apiKey, apiURL s
 	copy(keep, cm.rawHistory[historyLen-4:])
 
 	currentSummary := cm.runningSummary
+	genBefore := cm.generation
 
 	// Update raw history to only hold the kept messages before releasing lock
 	cm.rawHistory = keep
@@ -103,8 +106,11 @@ func (cm *ContextManager) CompressIfNeeded(ctx context.Context, apiKey, apiURL s
 
 	newSummary, err := callCompressionLLM(ctx, prompt, apiKey, apiURL)
 	if err != nil {
-		// Roll back raw history on error
+		// Roll back raw history on error — prepend old messages before any new ones that arrived
 		cm.mu.Lock()
+		if cm.generation != genBefore {
+			log.Printf("[Context] Warning: %d new messages arrived during failed compression. Prepending old messages.", cm.generation-genBefore)
+		}
 		cm.rawHistory = append(toCompress, cm.rawHistory...)
 		cm.mu.Unlock()
 		return fmt.Errorf("context compression failed: %w", err)

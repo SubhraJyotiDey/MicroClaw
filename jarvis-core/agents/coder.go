@@ -120,6 +120,7 @@ func (c *CoderAgent) RestoreBackup(filename string) error {
 
 // ExecuteScript runs the Python file using shell commands, capturing stdout and stderr.
 // Runs under context-based timeouts (5 seconds or parent deadline, whichever is shorter) to prevent infinite loops.
+// On Linux, the script runs as the 'nobody' user (UID 65534) for OS-level process isolation.
 func (c *CoderAgent) ExecuteScript(ctx context.Context, filename string) (string, string, error) {
 	scriptPath, err := c.resolvePath(filename)
 	if err != nil {
@@ -146,6 +147,9 @@ func (c *CoderAgent) ExecuteScript(ctx context.Context, filename string) (string
 	defer cancel()
 
 	cmd := exec.CommandContext(cmdCtx, pyCmd, scriptPath)
+
+	// Configure platform-specific process attributes (e.g. running as nobody user on Linux)
+	prepareCmdAttrs(cmd)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf
