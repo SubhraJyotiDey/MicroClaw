@@ -1,0 +1,69 @@
+# MicroClaw (Gopal Bhar Edition) 🐾
+
+MicroClaw is a lightweight, AI-powered hardware agent designed to run natively on a Raspberry Pi. It features the persona of **Gopal Bhar**, the legendary Bengali court jester—bringing intelligence, humor, and everyday wisdom to your smart home setup.
+
+## Features ✨
+- **Gopal Bhar Persona**: Interacts with wit and humor in Bengali, Hindi, or English.
+- **Native Audio Support**: Uses ALSA (`arecord` and `aplay`) for direct microphone and speaker interaction on Linux/Raspberry Pi.
+- **Hardware Control**: Actuates local network relays for smart devices like Kettles and Irrigation systems.
+- **Vision Capabilities**: Captures images via USB webcam using `fswebcam` to "see" its surroundings.
+- **Self-Healing Code Execution**: Can write, execute, and automatically fix Python scripts.
+- **Multi-Step Reasoning**: Capable of evaluating tool outputs and planning subsequent actions before speaking.
+
+## Hardware Requirements 🖥️
+- **Raspberry Pi** (or any Linux machine).
+- **USB Microphone & Speaker** (configured with ALSA).
+- **USB Webcam** (for vision).
+- **Network Relays** (for hardware control).
+
+## Software Dependencies 📦
+- **Go** (1.20+)
+- **Python** (3.8+)
+- **ALSA Utilities** (`alsa-utils` for `arecord` and `aplay`)
+- **fswebcam** (for taking pictures)
+
+### Installing Dependencies on Raspberry Pi
+```bash
+sudo apt-get update
+sudo apt-get install alsa-utils fswebcam python3
+```
+
+## Setup & Installation 🚀
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/SubhraJyotiDey/MicroClaw.git
+   cd MicroClaw
+   ```
+
+2. **Configure Environment Variables**
+   Create a `.env` file in the `jarvis-core` directory (or wherever the executable runs) and add your API keys and configuration:
+   ```env
+   # API Keys
+   GEMINI_API_KEY=your_api_key_here
+   
+   # Hardware Configuration
+   # Add any specific IP addresses or local endpoints if required by the hardware agent
+   ```
+
+3. **Build the Application**
+   ```bash
+   cd jarvis-core
+   go build -o microclaw
+   ```
+
+4. **Run MicroClaw**
+   ```bash
+   ./microclaw
+   ```
+
+## Usage 🛠️
+MicroClaw operates in an interactive CLI REPL. Type your commands or queries directly into the terminal.
+
+Example:
+```
+USER: Turn on the kettle.
+Gopal Bhar: *Thinking...* 
+[Executing hardware tool...]
+Gopal Bhar: Mashai, the kettle is on! A hot cup of tea will be ready soon, just like my sharp wit!
+```
