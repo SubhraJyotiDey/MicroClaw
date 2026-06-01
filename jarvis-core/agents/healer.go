@@ -87,8 +87,11 @@ func (h *HealerAgent) requestRepair(ctx context.Context, code, stderr, errMessag
 		"--- CRASHED SCRIPT ---\n%s\n\n"+
 		"--- ERROR MESSAGE ---\n%s\n\n"+
 		"--- STDERR OUTPUT ---\n%s\n\n"+
-		"Please fix the script and write the complete corrected Python code. "+
-		"CRITICAL: Output ONLY the raw corrected Python code. Do not wrap the code in markdown blocks (like ```python). Do not include any explanations.",
+		"Please fix the script and write the complete corrected Python code.\n"+
+		"CRITICAL RULES:\n"+
+		"1. Output ONLY the raw corrected Python code. Do not wrap the code in markdown blocks (like ```python). Do not include any explanations.\n"+
+		"2. You must ONLY use standard Python libraries (e.g. urllib.request instead of requests, subprocess, os, sys, math, time, json). DO NOT import external libraries.\n"+
+		"3. If the error is a 'ModuleNotFoundError' or similar missing library error, rewrite the script to solve the problem using standard built-in libraries instead.",
 		code, errMessage, stderr)
 
 	model := "llama-3.1-8b-instant"

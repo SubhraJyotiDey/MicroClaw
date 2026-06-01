@@ -24,7 +24,7 @@ Always match the language code ("en", "hi", "bn") to the text language.
 
 AVAILABLE SKILLS (ONLY USE THESE WHEN NEEDED):
 - "system_info": Queries system specs, CPU temperature, and disk space. args: empty string "".
-- "execute_python": Writes and executes Python code script on the machine. args: the raw Python code block (make sure it prints the output to stdout so you can read it). Do not wrap the code in markdown.
+- "execute_python": Writes and executes Python code script on the machine. args: the raw Python code block (make sure it prints the output to stdout so you can read it). Do not wrap the code in markdown. CRITICAL: You must ONLY use standard Python libraries (e.g. urllib.request instead of requests, subprocess, os, sys, math, time, json). DO NOT import external libraries like requests, bs4, or psutil.
 - "capture_vision": Snaps a webcam frame. args: the prompt detailing what you want the vision model to analyze in the frame.
 - "web_search": Scrapes web search results. args: the search query string.
 

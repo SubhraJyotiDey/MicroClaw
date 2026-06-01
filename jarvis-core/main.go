@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -97,6 +98,7 @@ func main() {
 	fmt.Println("    PROJECT JARVIS - GOPAL BHAR COURT JESTER SYSTEM")
 	fmt.Println("=============================================================")
 	fmt.Println("Commands:")
+	fmt.Println("  Speak naturally (Hands-free voice detection is active!).")
 	fmt.Println("  Type any message and press [Enter] to chat.")
 	fmt.Println("  Type /speak to record voice from the microphone (5s).")
 	fmt.Println("  Type /gender <male/female> to toggle TTS voice gender.")
@@ -108,15 +110,53 @@ func main() {
 	fmt.Printf("Gopal Bhar > %s\n\n", welcomeText)
 	speakAndPlay(ctx, ttsClient, player, welcomeText, "bn", gender)
 
-	scanner := bufio.NewScanner(os.Stdin)
+	// Channel for inputs (both CLI and VAD voice transcription)
+	inputChan := make(chan string, 10)
+
+	// Background CLI scanner
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			text := strings.TrimSpace(scanner.Text())
+			if text != "" {
+				inputChan <- text
+			}
+		}
+	}()
+
+	// Background Hands-free VAD callback
+	onSpeech := func(wavBytes []byte) {
+		reader := bytes.NewReader(wavBytes)
+		transcript, err := sttClient.Transcribe(ctx, reader, "auto")
+		if err != nil {
+			log.Printf("[VAD] STT transcription failed: %v", err)
+			return
+		}
+		transcript = strings.TrimSpace(transcript)
+		if transcript != "" {
+			fmt.Printf("\rUser (Voice) > %s\n", transcript)
+			inputChan <- transcript
+		}
+	}
+
+	vad := audio.NewVAD(onSpeech, bb.IsJarvisSpeaking)
+	go vad.StartLoop(ctx)
 
 	for {
 		fmt.Print("User > ")
-		if !scanner.Scan() {
+
+		var input string
+		select {
+		case <-ctx.Done():
+			break
+		case input = <-inputChan:
+		}
+
+		if ctx.Err() != nil {
 			break
 		}
 
-		input := strings.TrimSpace(scanner.Text())
+		input = strings.TrimSpace(input)
 		if input == "" {
 			continue
 		}
