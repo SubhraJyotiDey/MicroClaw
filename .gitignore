@@ -1,0 +1,11 @@
+# Secrets
+.env
+*.env
+
+# Databases
+*.db
+
+# Executables
+*.exe
+*.test
+bin/
