@@ -309,6 +309,11 @@ func speakAndPlay(ctx context.Context, tts *audio.TTSClient, player *audio.Playe
 		return
 	}
 
+	// For short responses (1-2 sentences), process as a single chunk to avoid extra network round-trips
+	if len(chunks) <= 2 {
+		chunks = []string{text}
+	}
+
 	for _, chunk := range chunks {
 		pr, pw := io.Pipe()
 

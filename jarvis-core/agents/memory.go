@@ -40,9 +40,15 @@ func NewMemoryAgent(dbPath string) (*MemoryAgent, error) {
 	}
 
 	// Enable WAL mode for better concurrent read/write performance on RPi
-	db.Exec("PRAGMA journal_mode=WAL;")
-	db.Exec("PRAGMA synchronous=NORMAL;")
-	db.Exec("PRAGMA cache_size=1000;")
+	if _, err := db.Exec("PRAGMA journal_mode=WAL;"); err != nil {
+		log.Printf("[MemoryAgent] Warning: WAL mode not available: %v", err)
+	}
+	if _, err := db.Exec("PRAGMA synchronous=NORMAL;"); err != nil {
+		log.Printf("[MemoryAgent] Warning: PRAGMA synchronous failed: %v", err)
+	}
+	if _, err := db.Exec("PRAGMA cache_size=1000;"); err != nil {
+		log.Printf("[MemoryAgent] Warning: PRAGMA cache_size failed: %v", err)
+	}
 
 	agent := &MemoryAgent{db: db}
 	if err := agent.initSchema(); err != nil {

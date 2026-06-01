@@ -46,7 +46,7 @@ func (v *VisionAgent) CaptureFrame(ctx context.Context, outputPath string) error
 		return os.WriteFile(outputPath, []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0xD9}, 0644)
 	}
 
-	cmd := exec.CommandContext(ctx, "fswebcam", "-r", "640x480", "--no-banner", outputPath)
+	cmd := exec.CommandContext(ctx, "fswebcam", "--no-banner", "-S", "5", outputPath)
 	if err := cmd.Run(); err != nil {
 		log.Printf("[VisionAgent] Warning: fswebcam execution failed: %v. Writing fallback placeholder.", err)
 		return os.WriteFile(outputPath, []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0xD9}, 0644)

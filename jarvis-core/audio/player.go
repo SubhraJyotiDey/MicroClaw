@@ -39,6 +39,7 @@ func (p *Player) Interrupt() {
 // PlayFiller plays a pre-cached local audio file (e.g., "Hmm") to mask latency.
 // Mutex protection ensures it releases the ALSA device before any streaming TTS begins.
 func (p *Player) PlayFiller(ctx context.Context, filepath string) error {
+	p.Interrupt()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -94,6 +95,7 @@ func (p *Player) PlayFiller(ctx context.Context, filepath string) error {
 
 // PlayStream reads from the audioReader and streams audio playback.
 func (p *Player) PlayStream(ctx context.Context, audioReader io.Reader) error {
+	p.Interrupt() // Terminate any active filler or playback to release ALSA device
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -106,15 +108,15 @@ func (p *Player) PlayStream(ctx context.Context, audioReader io.Reader) error {
 		return p.mockPlayback(ctx, audioReader)
 	}
 
-	// Assuming aplay reads raw or wav stream. If the TTS returns wav/mp3, aplay will read stdin.
-	cmd := exec.CommandContext(ctx, "aplay")
+	// TTS output is MP3, so we stream through mpg123
+	cmd := exec.CommandContext(ctx, "mpg123", "-")
 	cmd.Stdin = audioReader
 	p.cmdMu.Lock()
 	p.activeCmd = cmd
 	p.cmdMu.Unlock()
 
 	if err := cmd.Start(); err != nil {
-		log.Printf("[Player] Warning: Failed to run aplay: %v. Falling back to mock streaming.", err)
+		log.Printf("[Player] Warning: Failed to run mpg123: %v. Falling back to mock streaming.", err)
 		return p.mockPlayback(ctx, audioReader)
 	}
 
