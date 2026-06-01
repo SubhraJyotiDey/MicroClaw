@@ -18,6 +18,8 @@ import (
 type LLMResponse struct {
 	LanguageCode string `json:"language_code"`
 	Text         string `json:"text"`
+	SkillName    string `json:"skill_name,omitempty"`
+	SkillArgs    string `json:"skill_args,omitempty"`
 }
 
 // Router checks triggers, executes fast path local bypassing, and schedules LLM completions.

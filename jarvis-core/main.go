@@ -73,10 +73,18 @@ func main() {
 	sttClient := audio.NewSTTClient(apiKey, sttURL)
 	ttsClient := audio.NewTTSClient()
 
-	// Initialize agents
+	// Initialize execution agents
 	hwChan := make(chan agents.HardwareCommand, 100)
 	hwAgent := agents.NewHardwareAgent(kettleIP, irrigIP, memory)
 	go hwAgent.StartLoop(ctx, hwChan)
+
+	coderAgent, err := agents.NewCoderAgent("sandbox")
+	if err != nil {
+		log.Fatalf("Failed to initialize Python sandbox: %v", err)
+	}
+	healerAgent := agents.NewHealerAgent(coderAgent, llmKey, llmURL)
+	visionAgent := agents.NewVisionAgent(apiKey, llmURL)
+	skillsManager := agents.NewSkillsManager(healerAgent, visionAgent)
 
 	// Context and Router
 	cm := NewContextManager()
@@ -141,7 +149,7 @@ func main() {
 			if cmd == "/speak" {
 				audioPath := "speech.wav"
 				fmt.Println("[System] Speak now! Recording for 5 seconds...")
-				
+
 				// Record 5s WAV natively
 				err := audio.RecordAudio(ctx, 5*time.Second, audioPath)
 				if err != nil {
@@ -180,32 +188,60 @@ func main() {
 			}
 		}
 
-		// Process interaction through the router
+		// Process interaction through the router with dynamic multi-step skill loops
 		cm.AddMessage("user", input)
+		currentPrompt := input
 
-		resp, isFast, err := router.Route(ctx, input, cm)
-		if err != nil {
-			fmt.Printf("Gopal Bhar (Error) > ওরে বাবা! মাথা কাজ করছে না! (Error: %v)\n", err)
-			continue
+		// Allow up to 3 sequential skill calls per turn (Agentic Loop)
+		for attempt := 0; attempt < 3; attempt++ {
+			resp, isFast, err := router.Route(ctx, currentPrompt, cm)
+			if err != nil {
+				fmt.Printf("Gopal Bhar (Error) > ওরে বাবা! মাথা কাজ করছে না! (Error: %v)\n", err)
+				break
+			}
+
+			// Append LLM reply to context
+			respJSON, _ := json.Marshal(resp)
+			cm.AddMessage("assistant", string(respJSON))
+
+			// Check if a skill was requested
+			if resp.SkillName == "" {
+				source := "BRAIN"
+				if isFast {
+					source = "FAST PATH"
+				}
+				fmt.Printf("Gopal Bhar (%s) > %s\n\n", source, resp.Text)
+				speakAndPlay(ctx, ttsClient, player, resp.Text, resp.LanguageCode, gender)
+				break
+			}
+
+			// Skill triggered!
+			source := "BRAIN"
+			if isFast {
+				source = "FAST PATH"
+			}
+			fmt.Printf("Gopal Bhar (%s) [Skill: %s] > %s\n", source, resp.SkillName, resp.Text)
+			speakAndPlay(ctx, ttsClient, player, resp.Text, resp.LanguageCode, gender)
+
+			// Execute skill
+			output, err := skillsManager.Execute(ctx, resp.SkillName, resp.SkillArgs)
+			if err != nil {
+				output = fmt.Sprintf("Error executing skill: %v", err)
+			}
+
+			fmt.Printf("\n[Skill Output]\n%s\n\n", output)
+
+			// Append tool output to context
+			cm.AddMessage("system", fmt.Sprintf("[Tool Output for %s]: %s", resp.SkillName, output))
+
+			// Nudge LLM to synthesize final response
+			currentPrompt = "Formulate your final conversational response now that you have the tool execution output."
 		}
-
-		// Append reply to context
-		respJSON, _ := json.Marshal(resp)
-		cm.AddMessage("assistant", string(respJSON))
 
 		// Compress raw context history in background if needed
 		go func() {
 			_ = cm.CompressIfNeeded(context.Background(), apiKey, llmURL)
 		}()
-
-		source := "BRAIN"
-		if isFast {
-			source = "FAST PATH"
-		}
-		fmt.Printf("Gopal Bhar (%s) > %s\n\n", source, resp.Text)
-
-		// Play synthesized speech
-		speakAndPlay(ctx, ttsClient, player, resp.Text, resp.LanguageCode, gender)
 	}
 
 	log.Println("[Main] Gopal Bhar CLI shutdown finalized.")
