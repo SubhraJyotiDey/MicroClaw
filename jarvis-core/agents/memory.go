@@ -14,6 +14,7 @@ type SensorLog struct {
 	ID        int
 	Sensor    string
 	Value     float64
+	Simulated bool
 	Timestamp time.Time
 }
 
@@ -63,6 +64,7 @@ func (m *MemoryAgent) initSchema() error {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			sensor TEXT NOT NULL,
 			value REAL NOT NULL,
+			simulated INTEGER DEFAULT 0,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 		);`,
 		`CREATE TABLE IF NOT EXISTS gate_notes (
@@ -79,6 +81,10 @@ func (m *MemoryAgent) initSchema() error {
 			return err
 		}
 	}
+
+	// Auto-migrate: Add simulated column to sensor_logs if it doesn't exist yet
+	_, _ = m.db.Exec(`ALTER TABLE sensor_logs ADD COLUMN simulated INTEGER DEFAULT 0;`)
+
 	return nil
 }
 
@@ -100,15 +106,19 @@ func (m *MemoryAgent) GetSetting(key string) (string, error) {
 	return val, err
 }
 
-// LogSensor logs a reading from local sensors.
-func (m *MemoryAgent) LogSensor(sensor string, value float64) error {
-	_, err := m.db.Exec(`INSERT INTO sensor_logs (sensor, value) VALUES (?, ?);`, sensor, value)
+// LogSensor logs a reading from local sensors with a simulation indicator.
+func (m *MemoryAgent) LogSensor(sensor string, value float64, simulated bool) error {
+	simInt := 0
+	if simulated {
+		simInt = 1
+	}
+	_, err := m.db.Exec(`INSERT INTO sensor_logs (sensor, value, simulated) VALUES (?, ?, ?);`, sensor, value, simInt)
 	return err
 }
 
 // GetRecentSensorLogs fetches the last N readings for a specific sensor.
 func (m *MemoryAgent) GetRecentSensorLogs(sensor string, limit int) ([]SensorLog, error) {
-	rows, err := m.db.Query(`SELECT id, sensor, value, timestamp FROM sensor_logs 
+	rows, err := m.db.Query(`SELECT id, sensor, value, simulated, timestamp FROM sensor_logs 
 		WHERE sensor = ? ORDER BY timestamp DESC LIMIT ?;`, sensor, limit)
 	if err != nil {
 		return nil, err
@@ -119,9 +129,11 @@ func (m *MemoryAgent) GetRecentSensorLogs(sensor string, limit int) ([]SensorLog
 	for rows.Next() {
 		var sl SensorLog
 		var tsStr string
-		if err := rows.Scan(&sl.ID, &sl.Sensor, &sl.Value, &tsStr); err != nil {
+		var simInt int
+		if err := rows.Scan(&sl.ID, &sl.Sensor, &sl.Value, &simInt, &tsStr); err != nil {
 			return nil, err
 		}
+		sl.Simulated = (simInt != 0)
 		// Parse timestamp from SQLite format
 		t, err := time.Parse("2006-01-02 15:04:05", tsStr)
 		if err != nil {

@@ -40,10 +40,16 @@ sudo apt-get install alsa-utils fswebcam python3
    Create a `.env` file in the `jarvis-core` directory (or wherever the executable runs) and add your API keys and configuration:
    ```env
    # API Keys
-   GEMINI_API_KEY=your_api_key_here
-   
+   OPENROUTER_API_KEY=your_openrouter_api_key
+   GROQ_API_KEY=your_groq_api_key
+
+   # API Endpoints
+   API_URL_LLM=https://openrouter.ai/api/v1/chat/completions
+   API_URL_STT=https://api.groq.com/openai/v1/audio/transcriptions
+
    # Hardware Configuration
-   # Add any specific IP addresses or local endpoints if required by the hardware agent
+   KETTLE_IP=192.168.1.50
+   IRRIG_IP=192.168.1.51
    ```
 
 3. **Build the Application**

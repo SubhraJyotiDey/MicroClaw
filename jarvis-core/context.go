@@ -66,26 +66,35 @@ func (cm *ContextManager) GetMessagesForLLM(systemPrompt string) []Message {
 	return msgs
 }
 
-// CompressIfNeeded compresses history exceeding the raw limit (4 turns) using a fast LLM pass.
 func (cm *ContextManager) CompressIfNeeded(ctx context.Context, apiKey, apiURL string) error {
 	cm.mu.Lock()
 	historyLen := len(cm.rawHistory)
-	cm.mu.Unlock()
-
 	if historyLen <= 4 {
+		cm.mu.Unlock()
 		return nil // Under the threshold, no action needed
 	}
 
-	cm.mu.Lock()
-	toCompress := cm.rawHistory[:historyLen-4]
-	keep := cm.rawHistory[historyLen-4:]
+	// Extract messages to compress and keep under lock
+	toCompress := make([]Message, historyLen-4)
+	copy(toCompress, cm.rawHistory[:historyLen-4])
+
+	keep := make([]Message, 4)
+	copy(keep, cm.rawHistory[historyLen-4:])
+
 	currentSummary := cm.runningSummary
+
+	// Update raw history to only hold the kept messages before releasing lock
+	cm.rawHistory = keep
 	cm.mu.Unlock()
 
 	log.Printf("[Context] Pruning raw context. Compressing %d messages into summary...", len(toCompress))
 
 	historyBytes, err := json.Marshal(toCompress)
 	if err != nil {
+		// Roll back raw history on error
+		cm.mu.Lock()
+		cm.rawHistory = append(toCompress, cm.rawHistory...)
+		cm.mu.Unlock()
 		return err
 	}
 
@@ -94,12 +103,15 @@ func (cm *ContextManager) CompressIfNeeded(ctx context.Context, apiKey, apiURL s
 
 	newSummary, err := callCompressionLLM(ctx, prompt, apiKey, apiURL)
 	if err != nil {
+		// Roll back raw history on error
+		cm.mu.Lock()
+		cm.rawHistory = append(toCompress, cm.rawHistory...)
+		cm.mu.Unlock()
 		return fmt.Errorf("context compression failed: %w", err)
 	}
 
 	cm.mu.Lock()
 	cm.runningSummary = newSummary
-	cm.rawHistory = keep
 	cm.mu.Unlock()
 
 	log.Printf("[Context] Compressing complete. New summary: %q", newSummary)

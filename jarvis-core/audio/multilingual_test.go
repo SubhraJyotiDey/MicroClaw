@@ -31,7 +31,7 @@ func TestMultilingualTTS(t *testing.T) {
 			defer cancel()
 
 			buf := &bytes.Buffer{}
-			err := tts.StreamSpeech(ctx, tc.text, tc.lang, buf)
+			err := tts.StreamSpeech(ctx, tc.text, tc.lang, "female", buf)
 			if err != nil {
 				t.Fatalf("Speech synthesis failed for %s: %v", tc.name, err)
 			}

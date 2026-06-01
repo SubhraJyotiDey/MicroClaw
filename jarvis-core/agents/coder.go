@@ -24,9 +24,33 @@ func NewCoderAgent(sandboxDir string) (*CoderAgent, error) {
 	return &CoderAgent{sandboxDir: sandboxDir}, nil
 }
 
+// resolvePath validates that the target filename resides strictly inside the sandbox.
+func (c *CoderAgent) resolvePath(filename string) (string, error) {
+	cleanSandbox, err := filepath.Abs(c.sandboxDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve sandbox directory: %w", err)
+	}
+
+	targetPath := filepath.Clean(filepath.Join(c.sandboxDir, filename))
+	targetAbs, err := filepath.Abs(targetPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve target path: %w", err)
+	}
+
+	// Verify that target path is a child of the sandbox directory
+	if !strings.HasPrefix(targetAbs, cleanSandbox) {
+		return "", fmt.Errorf("security violation: path traversal detected (target: %s, sandbox: %s)", targetAbs, cleanSandbox)
+	}
+
+	return targetAbs, nil
+}
+
 // WriteScript writes Python source code to a designated file inside the sandbox.
 func (c *CoderAgent) WriteScript(filename string, code string) (string, error) {
-	targetPath := filepath.Join(c.sandboxDir, filename)
+	targetPath, err := c.resolvePath(filename)
+	if err != nil {
+		return "", err
+	}
 	if err := os.WriteFile(targetPath, []byte(code), 0644); err != nil {
 		return "", fmt.Errorf("failed to save script file: %w", err)
 	}
@@ -35,8 +59,14 @@ func (c *CoderAgent) WriteScript(filename string, code string) (string, error) {
 
 // BackupScript creates a copy of the script file (.bak extension).
 func (c *CoderAgent) BackupScript(filename string) error {
-	srcPath := filepath.Join(c.sandboxDir, filename)
-	destPath := filepath.Join(c.sandboxDir, filename+".bak")
+	srcPath, err := c.resolvePath(filename)
+	if err != nil {
+		return err
+	}
+	destPath, err := c.resolvePath(filename + ".bak")
+	if err != nil {
+		return err
+	}
 
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
@@ -51,8 +81,14 @@ func (c *CoderAgent) BackupScript(filename string) error {
 
 // RestoreBackup overwrites the script file with its backup version.
 func (c *CoderAgent) RestoreBackup(filename string) error {
-	srcPath := filepath.Join(c.sandboxDir, filename+".bak")
-	destPath := filepath.Join(c.sandboxDir, filename)
+	srcPath, err := c.resolvePath(filename + ".bak")
+	if err != nil {
+		return err
+	}
+	destPath, err := c.resolvePath(filename)
+	if err != nil {
+		return err
+	}
 
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
@@ -66,9 +102,12 @@ func (c *CoderAgent) RestoreBackup(filename string) error {
 }
 
 // ExecuteScript runs the Python file using shell commands, capturing stdout and stderr.
-// Runs under context-based timeouts (5 seconds) to prevent infinite loops.
+// Runs under context-based timeouts (5 seconds or parent deadline, whichever is shorter) to prevent infinite loops.
 func (c *CoderAgent) ExecuteScript(ctx context.Context, filename string) (string, string, error) {
-	scriptPath := filepath.Join(c.sandboxDir, filename)
+	scriptPath, err := c.resolvePath(filename)
+	if err != nil {
+		return "", "", err
+	}
 
 	// Resolve the correct python executable name
 	pyCmd := "python"
@@ -78,7 +117,15 @@ func (c *CoderAgent) ExecuteScript(ctx context.Context, filename string) (string
 		}
 	}
 
-	cmdCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	timeout := 5 * time.Second
+	if dl, ok := ctx.Deadline(); ok {
+		remaining := time.Until(dl)
+		if remaining < timeout {
+			timeout = remaining
+		}
+	}
+
+	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(cmdCtx, pyCmd, scriptPath)
@@ -87,12 +134,12 @@ func (c *CoderAgent) ExecuteScript(ctx context.Context, filename string) (string
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
-	err := cmd.Run()
+	err = cmd.Run()
 	stdout := stdoutBuf.String()
 	stderr := stderrBuf.String()
 
 	if cmdCtx.Err() == context.DeadlineExceeded {
-		return stdout, stderr, fmt.Errorf("script execution timed out (limit 5s)")
+		return stdout, stderr, fmt.Errorf("script execution timed out (limit %v)", timeout)
 	}
 
 	return stdout, stderr, err

@@ -61,24 +61,30 @@ func (r *Router) Route(ctx context.Context, userText string, cm *ContextManager)
 
 	// Check Kettle Fast-Path
 	if hasKettle && (hasOn || hasOff) {
-		action := "on"
-		if hasOff {
-			action = "off"
+		// If both are present, bypass fast-path to let LLM resolve ambiguity
+		if !(hasOn && hasOff) {
+			action := "on"
+			if hasOff {
+				action = "off"
+			}
+			log.Printf("[Router] Fast-Path Bypass: Device=kettle Action=%s", action)
+			r.sendHardwareCmd(agents.HardwareCommand{Device: "kettle", Action: action})
+			return r.getFastResponse(cleanedText, "kettle", action), true, nil
 		}
-		log.Printf("[Router] Fast-Path Bypass: Device=kettle Action=%s", action)
-		r.sendHardwareCmd(agents.HardwareCommand{Device: "kettle", Action: action})
-		return r.getFastResponse(cleanedText, "kettle", action), true, nil
 	}
 
 	// Check Irrigation Fast-Path
 	if hasIrrig && (hasOn || hasOff) {
-		action := "on"
-		if hasOff {
-			action = "off"
+		// If both are present, bypass fast-path to let LLM resolve ambiguity
+		if !(hasOn && hasOff) {
+			action := "on"
+			if hasOff {
+				action = "off"
+			}
+			log.Printf("[Router] Fast-Path Bypass: Device=irrigation Action=%s", action)
+			r.sendHardwareCmd(agents.HardwareCommand{Device: "irrigation", Action: action})
+			return r.getFastResponse(cleanedText, "irrigation", action), true, nil
 		}
-		log.Printf("[Router] Fast-Path Bypass: Device=irrigation Action=%s", action)
-		r.sendHardwareCmd(agents.HardwareCommand{Device: "irrigation", Action: action})
-		return r.getFastResponse(cleanedText, "irrigation", action), true, nil
 	}
 
 	// Slow-Path: Query Brain LLM
@@ -106,17 +112,33 @@ func matchesOff(text string) bool {
 }
 
 func detectLang(text string) string {
-	// Check for Devanagari range (Hindi)
+	hiCount := 0
+	bnCount := 0
+	enCount := 0
+
 	for _, c := range text {
 		if c >= 0x0900 && c <= 0x097F {
-			return "hi"
-		}
-		// Check for Bengali range
-		if c >= 0x0980 && c <= 0x09FF {
-			return "bn"
+			hiCount++
+		} else if c >= 0x0980 && c <= 0x09FF {
+			bnCount++
+		} else if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			enCount++
 		}
 	}
-	return "en"
+
+	// If there are more English letters than Hindi/Bengali script characters, classify as English
+	if enCount > hiCount && enCount > bnCount {
+		return "en"
+	}
+
+	if hiCount == 0 && bnCount == 0 {
+		return "en"
+	}
+
+	if hiCount > bnCount {
+		return "hi"
+	}
+	return "bn"
 }
 
 func (r *Router) getFastResponse(userText, device, action string) *LLMResponse {

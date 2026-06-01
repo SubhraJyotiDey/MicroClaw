@@ -111,8 +111,9 @@ func (v *VAD) StartLoop(ctx context.Context) {
 
 		v.mu.Lock()
 		muted := v.isMuted
-		speaking := v.isSpeaking()
 		v.mu.Unlock()
+
+		speaking := v.isSpeaking()
 
 		if muted || speaking {
 			cleanupCmd()

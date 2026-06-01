@@ -108,7 +108,7 @@ func TestMemorySQLite(t *testing.T) {
 	}
 
 	// Sensor Log Test
-	err = ma.LogSensor("soil_moisture", 45.2)
+	err = ma.LogSensor("soil_moisture", 45.2, false)
 	if err != nil {
 		t.Errorf("Failed logging sensor: %v", err)
 	}

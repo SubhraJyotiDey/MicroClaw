@@ -49,7 +49,7 @@ func (p *PulseAgent) performSweep(rng *rand.Rand) {
 
 	// 1. Simulate soil moisture sensor (30% to 75%)
 	moisture := 32.0 + rng.Float64()*40.0
-	if err := p.memory.LogSensor("soil_moisture", moisture); err != nil {
+	if err := p.memory.LogSensor("soil_moisture", moisture, true); err != nil {
 		log.Printf("[PulseAgent] Failed database write for moisture sensor: %v", err)
 	} else {
 		log.Printf("[PulseAgent] Swept: Balcony Soil Moisture = %.1f%%", moisture)
@@ -57,7 +57,7 @@ func (p *PulseAgent) performSweep(rng *rand.Rand) {
 
 	// 2. Simulate Kettle temperature sensor (20C to 35C idle)
 	temp := 21.0 + rng.Float64()*8.0
-	if err := p.memory.LogSensor("kettle_temp", temp); err != nil {
+	if err := p.memory.LogSensor("kettle_temp", temp, true); err != nil {
 		log.Printf("[PulseAgent] Failed database write for kettle temperature: %v", err)
 	} else {
 		log.Printf("[PulseAgent] Swept: Kettle Temperature = %.1f C", temp)

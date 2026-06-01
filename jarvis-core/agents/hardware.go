@@ -96,7 +96,7 @@ func (h *HardwareAgent) logStateToDB(device, action string) {
 		val = -1.0
 	}
 
-	if err := h.memory.LogSensor(device+"_state", val); err != nil {
+	if err := h.memory.LogSensor(device+"_state", val, false); err != nil {
 		log.Printf("[HardwareAgent] Failed to log state change in SQLite: %v", err)
 	}
 }
@@ -115,14 +115,12 @@ func (h *HardwareAgent) StartLoop(ctx context.Context, cmdChan <-chan HardwareCo
 				return
 			}
 			log.Printf("[HardwareAgent] Processing channel trigger: %+v", cmd)
-			go func(c HardwareCommand) {
-				// Execute asynchronously in a separate context to prevent locking the loop
-				execCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				defer cancel()
-				if err := h.ControlDevice(execCtx, c.Device, c.Action); err != nil {
-					log.Printf("[HardwareAgent] Control action failed: %v", err)
-				}
-			}(cmd)
+			// Execute sequentially in a separate context to prevent out-of-order hardware actions
+			execCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			if err := h.ControlDevice(execCtx, cmd.Device, cmd.Action); err != nil {
+				log.Printf("[HardwareAgent] Control action failed: %v", err)
+			}
+			cancel()
 		}
 	}
 }

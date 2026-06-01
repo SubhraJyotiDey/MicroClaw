@@ -280,7 +280,9 @@ func main() {
 
 		// Compress raw context history in background if needed
 		go func() {
-			_ = cm.CompressIfNeeded(context.Background(), apiKey, llmURL)
+			if err := cm.CompressIfNeeded(context.Background(), apiKey, llmURL); err != nil {
+				log.Printf("[Context Manager] Background compression failed: %v", err)
+			}
 		}()
 	}
 
@@ -295,8 +297,10 @@ func speakAndPlay(ctx context.Context, tts *audio.TTSClient, player *audio.Playe
 		err := tts.StreamSpeech(ctx, text, lang, gender, pw)
 		if err != nil {
 			log.Printf("[TTS ERROR] %v", err)
+			_ = pw.CloseWithError(err)
+		} else {
+			_ = pw.Close()
 		}
-		_ = pw.Close()
 	}()
 
 	// Read and play on primary ALSA output device (aplay)
@@ -304,4 +308,5 @@ func speakAndPlay(ctx context.Context, tts *audio.TTSClient, player *audio.Playe
 	if err != nil {
 		log.Printf("[PLAYBACK ERROR] %v", err)
 	}
+	_ = pr.Close()
 }
